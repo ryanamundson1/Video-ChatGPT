@@ -63,10 +63,10 @@ class Conversation:
     def append_message(self, role, message):
         self.messages.append([role, message])
 
-    def get_video_frames(self, n_clips=1, num_frm=100):
+    def get_video_frames(self, n_clips=1, num_frm=100, skip_frames=2):
         video_frames = []
         for i, (role, msg) in enumerate(self.messages[self.offset:]):
-            if i % 2 == 0:
+            if i % skip_frames == 0:
                 if type(msg) is tuple:
                     msg, video_path = msg
 

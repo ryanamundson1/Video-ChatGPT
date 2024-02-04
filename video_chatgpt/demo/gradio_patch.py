@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from gradio.components import *
 from markdown2 import Markdown
+from enum import Enum
 
 
 class _Keywords(Enum):
@@ -13,7 +14,7 @@ class _Keywords(Enum):
     FINISHED_ITERATING = "FINISHED_ITERATING"  # Used to skip processing of a component's value (needed for generators + state)
 
 
-@document("style")
+#@document("style")
 class Chatbot(Changeable, Selectable, IOComponent, JSONSerializable):
     """
     Displays a chatbot output showing both user submitted messages and responses. Supports a subset of Markdown including bold, italics, code, and images.

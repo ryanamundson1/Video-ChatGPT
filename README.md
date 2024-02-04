@@ -89,14 +89,10 @@ pip install -r requirements.txt
 
 export PYTHONPATH="./:$PYTHONPATH"
 ```
-Additionally, install [FlashAttention](https://github.com/HazyResearch/flash-attention) for training,
+Additionally, install [FlashAttention](https://github.com/HazyResearch/flash-attention) for training (Not availible for Apple) ,
 ```shell
 pip install ninja
 
-git clone https://github.com/HazyResearch/flash-attention.git
-cd flash-attention
-git checkout v1.0.7
-python setup.py install
 ```
 
 ---

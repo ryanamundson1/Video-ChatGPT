@@ -9,7 +9,7 @@ from video_chatgpt.constants import *
 import torch
 
 
-def load_video(vis_path, n_clips=1, num_frm=100):
+def load_video(vis_path, n_clips=1, num_frm=100, skip_frames=4):
     """
     Load video frames from a video file.
 
@@ -17,6 +17,7 @@ def load_video(vis_path, n_clips=1, num_frm=100):
     vis_path (str): Path to the video file.
     n_clips (int): Number of clips to extract from the video. Defaults to 1.
     num_frm (int): Number of frames to extract from each clip. Defaults to 100.
+    skip_frames (int): Number of frames skip in extraction. Defaults to 2.
 
     Returns:
     list: List of PIL.Image.Image objects representing video frames.
@@ -24,6 +25,8 @@ def load_video(vis_path, n_clips=1, num_frm=100):
 
     # Load video with VideoReader
     vr = VideoReader(vis_path, ctx=cpu(0))
+    # We shouldn't need to use every frame
+    vr.skip_frames(skip_frames)
     total_frame_num = len(vr)
 
     # Currently, this function supports only 1 clip
@@ -79,7 +82,7 @@ def get_seq_frames(total_num_frames, desired_num_frames):
     return seq
 
 
-def initialize_model(model_name, projection_path=None):
+def initialize_model(model_name, projection_path=None, device='mps'):
     """
     Initializes the model with given parameters.
 
@@ -98,14 +101,25 @@ def initialize_model(model_name, projection_path=None):
     model_name = os.path.expanduser(model_name)
 
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, device=device)
 
     # Load model
-    model = VideoChatGPTLlamaForCausalLM.from_pretrained(model_name, low_cpu_mem_usage=True, torch_dtype=torch.float16,
-                                                         use_cache=True)
+    ## Added mps
+    model = VideoChatGPTLlamaForCausalLM.from_pretrained(model_name, 
+                                                         low_cpu_mem_usage=True, 
+                                                         torch_dtype=torch.float16,
+                                                         use_cache=True).to(device)
+    
+    ## Added mps
+    #import llama_cpp
+    #model = llama_cpp.Llama(model_path=model_name)
+    
+
 
     # Load image processor
-    image_processor = CLIPImageProcessor.from_pretrained(model.config.mm_vision_tower, torch_dtype=torch.float16)
+    image_processor = CLIPImageProcessor.from_pretrained(model.config.mm_vision_tower, 
+                                                         torch_dtype=torch.float16, 
+                                                         device=device)
 
     # Set to use start and end tokens for video
     mm_use_vid_start_end = True
@@ -128,13 +142,16 @@ def initialize_model(model_name, projection_path=None):
 
     # Set model to evaluation mode and move to GPU
     model = model.eval()
-    model = model.cuda()
+    #model = model.cuda()
+    model.to(device)
+
+    alt_vision_tower = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
 
     vision_tower_name = "openai/clip-vit-large-patch14"
 
     # Load vision tower and move to GPU
     vision_tower = CLIPVisionModel.from_pretrained(vision_tower_name, torch_dtype=torch.float16,
-                                                   low_cpu_mem_usage=True).cuda()
+                                                   low_cpu_mem_usage=True).to(device)
     vision_tower = vision_tower.eval()
 
     # Configure vision model

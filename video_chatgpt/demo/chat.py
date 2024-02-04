@@ -1,6 +1,7 @@
 import time
 import torch
 import gradio as gr
+from torch import mps
 from video_chatgpt.utils import (build_logger)
 from video_chatgpt.video_conversation import conv_templates, SeparatorStyle
 from video_chatgpt.video_conversation import load_video
@@ -28,11 +29,12 @@ def post_process_code(code):
             for i in range(1, len(blocks), 2):
                 blocks[i] = blocks[i].replace("\\_", "_")
         code = sep.join(blocks)
+    logger.info(f"{code}")
     return code
 
 
 class Chat:
-    def __init__(self, model_name, conv_mode, tokenizer, image_processor, vision_tower, model, replace_token):
+    def __init__(self, model_name, conv_mode, tokenizer, image_processor, vision_tower, model, replace_token, device='mps'):
         self.model_name = model_name
         self.conv_mode = conv_mode
         self.tokenizer = tokenizer
@@ -40,9 +42,11 @@ class Chat:
         self.vision_tower = vision_tower
         self.model = model
         self.replace_token = replace_token
+        self.device = device
 
     def upload_video(self, video, img_list):
         if isinstance(video, str):  # is a path
+            logger.info(f"{video}") # Video nams
             frames = load_video(video)
             image_tensor = self.image_processor.preprocess(frames, return_tensors='pt')['pixel_values']
             img_list.append(image_tensor)
@@ -53,6 +57,7 @@ class Chat:
 
     def get_spatio_temporal_features_torch(self, features):
         t, s, c = features.shape
+        logger.info(features.shape)
         temporal_tokens = torch.mean(features, dim=1)
         padding_size = 100 - t
         if padding_size > 0:
@@ -83,7 +88,7 @@ class Chat:
 
         inputs = self.tokenizer([prompt])
 
-        input_ids = torch.as_tensor(inputs.input_ids).cuda()
+        input_ids = torch.as_tensor(inputs.input_ids).to(self.device)
 
         stop_str = state.sep if state.sep_style != SeparatorStyle.TWO else state.sep2
         keywords = [stop_str]
@@ -104,7 +109,7 @@ class Chat:
 
         image_tensor = img_list[0]
         # Generate video spatio-temporal features
-        image_tensor = image_tensor.half().cuda()
+        image_tensor = image_tensor.half().to(self.device) #.half().cuda()
         with torch.no_grad():
             image_forward_outs = self.vision_tower(image_tensor, output_hidden_states=True)
             select_hidden_state_layer = -2  # Same as used in LLaVA
@@ -112,13 +117,14 @@ class Chat:
             frame_features = select_hidden_state[:, 1:]
         video_spatio_temporal_features = self.get_spatio_temporal_features_torch(frame_features)
 
+        mps.empty_cache() # Clear the MPS cache for space
         with torch.inference_mode():
             output_ids = self.model.generate(
                 input_ids,
                 video_spatio_temporal_features=video_spatio_temporal_features.unsqueeze(0),
                 do_sample=True,
                 temperature=float(temperature),
-                max_new_tokens=min(int(max_new_tokens), 1536),
+                max_new_tokens=min(int(max_new_tokens), 1024),
                 stopping_criteria=[stopping_criteria])
 
         input_token_len = input_ids.shape[1]

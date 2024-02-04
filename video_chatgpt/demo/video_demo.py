@@ -13,6 +13,8 @@ from video_chatgpt.demo.template import tos_markdown, css, title, disclaimer, Se
 from video_chatgpt.eval.model_utils import initialize_model
 from video_chatgpt.constants import *
 
+#os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"]="0.7"
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"]="1"
 import logging
 
 logging.basicConfig(level=logging.WARNING)
